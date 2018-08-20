@@ -9,7 +9,7 @@ output: html_document
 ```{r packages, include=FALSE}
 
 # install(pacman) # install + require packages
-# pacman::p_load(dplyr, readr, knitr, AICcmodavg, robust, betareg, corrplot, lmtest, ggplot2, tidyr, texreg, stringr) 
+pacman::p_load(dplyr, readr, knitr, sp, raster, lulcc, alluvial, car) 
 # dplyr >> filter for rows / select for collumns
 
 ```
@@ -25,6 +25,233 @@ knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 
 # setwd()
 
+## Set RasterOptions ## important when running cross.tabulation for large datasets
+rasterOptions()
+rasterOptions(tmpdir="C:/Temp.R", maxmemory=1e+10)
+
 ```
 
 ## Read data
+```{r read data, include=FALSE}
+
+# Create a different folder for each level of classification (L1, L2, L3). It make easy to import rasters.
+# Adapt PATH
+
+r.LU1 = list.files(path = ".", pattern = ".img$", full.names=T)
+sLU1 = stack(r.LU1)
+
+r.LU2 = list.files(path = ".", pattern = ".img$", full.names=T)
+sLU2 = stack(r.LU2)
+
+r.LU3 = list.files(path = ".", pattern = ".img$", full.names=T)
+sLU3 = stack(r.LU3)
+
+## clean console before start ## just leave stacks
+
+```
+
+
+```{r area table, include=FALSE}
+
+## Build table with LCLU classes (rows) x Years (collumns), area must be in km2
+## One table for each level
+
+ft.LU1 = freq(sLU1, digits=0, long=FALSE, useNA="no", progress="text", merge = TRUE)
+row.names(ft.LU1) = ft.LU1$value
+ft.LU1 = ft.LU1[,-1] # delete column 1 = 'value'
+
+at.LU1 = ((ft.LU1*900)*0.001) # from cell frequency to area (km2)
+at.LU1
+
+## Export at.LU to csv or excel
+
+```
+
+
+```{r cross table, include=FALSE}
+
+## cross table = indicates the area of a LU which became another LU 
+## One table for each level
+
+ct.LU1 = crosstab(sLU1, digits=0, long=FALSE, useNA=FALSE, progress="text")
+summary(ct.LU1)
+head (ct.LU1)
+
+ct.df.LU1 = as.data.frame(ct.LU1) # Frequencies as dataframe
+summary(ct.df.LU1)
+head (ct.df.LU1)
+
+## Export ct.df.LU to csv or excel
+
+```
+
+
+```{r Alluvial graph 1, include=FALSE}
+
+## Preparing data for alluvial graphs
+## The example bellow was created for Classification LEVEL 2 - We should also adapt the code for level 1 and level 3
+
+
+# change/no change
+ct.df.LU2$change = factor(rep(NA, length(ct.df.LU2$Var7) ), levels=c("yes", "no") ) 
+head (ct.df.LU2)
+levels(ct.df.LU2$change)
+
+#### You cannot assign values to a factor variable if there is no corresponding 'level' in the factor attributes.
+levels(ct.df.LU2$Var1)
+levels(ct.df.LU2$Var2)
+levels(ct.df.LU2$Var1) = c(levels(ct.df.LU2$Var1), "4", "5") #same levels for every Var
+
+#ct.df.LU2$change = with(ct.df.LU2, ifelse(Var1 == Var2 & Var2 == Var3 & Var3 == Var4
+#& Var4 == Var5 & Var5 == Var6 & Var6 == Var7,
+#"no","yes"))
+
+ct.df.LU2$change = with(ct.df.LU2, ifelse(Var1 == Var2 & Var2 == Var3 & Var3 == Var4
+                                                & Var4 == Var5 & Var5 == Var6 & Var6 == Var7,
+                                                "no", ifelse((Var1 == '1'| Var1 == '2')& 
+                                                               (Var2 == '1'| Var2 == '2')&
+                                                               (Var3 == '1'| Var3 == '2')&
+                                                               (Var4 == '1'| Var4 == '2')&
+                                                               (Var5 == '1'| Var5 == '2')&
+                                                               (Var6 == '1'| Var6 == '2')&
+                                                               (Var7 == '1'| Var7 == '2'),
+                                                             "no", "yes")))
+
+head (ct.df.LU2)
+
+
+# Rename columns
+names (ct.df.LU2) = c("Y1985","Y1990","Y1995", "Y2000","Y2005","Y2010","Y2015","Freq", "Change")
+head (ct.df.LU2)
+
+#Rename classes
+l2cat = c(1, 2, 3, 4, 5, 6, 7, 8 ,9, 10, 11)
+l2lab = c("Forest", "Savanic formations", "Wetlands", "Secondary complex",
+          "Agriculture", "Pasturelands", "Bare land", "Urban", "Water surface",
+          "Burned land","Confusion")
+l2abrev = c("For", "Sav", "Wet", "Sec", "Agr", "Pas", "Bar", "Urb", "Wat","Bur","Con")
+l2classes = cbind(l2cat, l2lab, l2abrev)
+l2classes
+
+ct.df.LU2[,c(1:7)] <- lapply(ct.df.LU2[,c(1:7)], function(x) 
+  recode(x, "'1'= 'For';
+         '2'= 'Sav';
+         '3'= 'Wet';
+         '4'= 'Sec';
+         '5'= 'Agr';
+         '6'= 'Pas';
+         '7'= 'Bar';
+         '8'= 'Urb';
+         '9'= 'Wat';
+         '10'='Bur';
+         '11'='Con';",
+         as.factor.result=TRUE))
+
+levels(ct.df.LU2$Y1985)
+levels(ct.df.LU2$Y2015)
+summary(ct.df.LU2)
+head (ct.df.LU2)
+
+# Adjust data.frame (dataset 2)
+ct.df.LU22 = na.omit(ct.df.LU2) #delete NAs
+ct.df.LU22 = droplevels(ct.df.LU22[-which(ct.df.LU22$Freq == 0),]) #delete freq=0
+
+summary(ct.df.LU22)
+head (ct.df.LU22)
+
+
+##########################
+## delete classes with too few changes  (dataset 3)
+ct.df.LU23 = ct.df.LU22
+
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y1985 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #delete classes
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y1990 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #delete classes
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y1995 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #delete classes
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y2000 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #delete classes
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y2005 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #delete classes
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y2010 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #delete classes
+ct.df.LU23 = droplevels(ct.df.LU23[-which(ct.df.LU23$Y2015 %in% c("Wet", "Bar", "Sec",
+                                                                           "Urb", "Wat","Bur","Con")),]) #deleted classes
+summary(ct.df.LU23)
+head (ct.df.LU23)
+
+
+##########################
+# Change YES - dataset  (dataset 4)
+ct.df.LU24 = droplevels(ct.df.LU23[-which(ct.df.LU23$Change == "no"),]) #delete change=no
+ct.df.LU24 = na.omit(ct.df.LU24) #delete NAs
+
+summary(ct.df.LU24)
+head (ct.df.LU24)
+
+##########################
+# What became agriculture/pasturelands in 2015?  (dataset 5) 
+ct.df.LU25 = ct.df.LU23
+
+ct.df.LU25 = droplevels(ct.df.LU25[which(ct.df.LU25$Y2015 %in% 
+                        c("Agr", "Pas")),])  # delete classes # notice which instead of -which
+
+ct.df.LU25 = na.omit(ct.df.LU25) #delete NAs
+summary(ct.df.LU25)
+head (ct.df.LU25)
+
+```
+
+
+```{r Alluvial graph 2, include=T}
+
+
+## Alluvial graphs
+
+#par()
+#save tiff images in working directory ##save in bath>> %d
+#tiff(filename = "Rplot%d.tif", pointsize=10, width=190, height=153, units= "mm", res = 300, compression = 'lzw')
+
+# data2 - all
+par (ps=90, pin = c(7.3, 6)) # pin=6.29125 3.81625
+alluvial( ct.df.LU22[,1:7], border = NA, cex = 0.1, cex.axis = 0.1, 
+          freq = ct.df.LU22$Freq, 
+          col = ifelse(ct.df.LU22$Y2015 == "Agr", "orchid",
+                       ifelse(ct.df.LU22$Y2015 == "Pas", "orange1","gray")),
+          alpha = 0.8,
+          hide = ct.df.LU22$Freq < quantile(ct.df.LU22$Freq, .9))
+
+# data3 - no small classes
+par (ps=90, pin = c(7.3, 6)) # pin=6.29125 3.81625
+alluvial( ct.df.LU23[,1:7], border = NA, cex = 0.1, cex.axis = 0.1, 
+          freq = ct.df.LU23$Freq, 
+          col = ifelse(ct.df.LU23$Y2015 == "Agr", "orchid",
+                       ifelse(ct.df.LU23$Y2015 == "Pas", "orange1","lightgreen")),
+          alpha = 0.8,
+          hide = ct.df.LU23$Freq < quantile(ct.df.LU23$Freq, .75))
+
+# data4 - just changes
+par (ps=90, pin = c(7.3, 6)) # pin=6.29125 3.81625
+alluvial(ct.df.LU24[,1:7], border = NA, cex = 0.1, cex.axis = 0.1,
+         freq=ct.df.LU24$Freq,
+         #col=ifelse(ct.df.LU24$Y2015 == "Agr", "orchid", 
+         #           ifelse(ct.df.LU24$Y2015 == "Pas", "orange1", "gray")),
+         alpha = 0.5
+)
+
+# data5 - what became agriculture and pasturelands?
+par (ps=90, pin = c(7.3, 6)) # pin=6.29125 3.81625
+alluvial( ct.df.LU25[,1:7], cex = 0.1, cex.axis = 0.1, 
+          freq = ct.df.LU25$Freq, 
+          alpha = 0.5
+          #col = ifelse(ct.df.LU25$Y2015 == "Agr", "plum2", "sandybrown"), 
+)
+
+#end-exporting images ## dev.off()
+dev.off()
+
+
+## 
+
+```
