@@ -10,7 +10,7 @@ output: html_document
 
 # install(pacman) # install + require packages
 pacman::p_load(dplyr, readr, knitr, sp, raster, lulcc, alluvial, car) 
-# dplyr >> filter for rows / select for collumns
+# dplyr >> filter for rows / select for collumns 
 
 ```
 
