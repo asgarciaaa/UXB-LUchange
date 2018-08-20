@@ -1,0 +1,30 @@
+---
+title: "UXRB-LCLUc"
+author: "Andrea S Garcia"
+date: "r Sys.Date()"
+output: html_document
+---
+
+## Set section  
+```{r packages, include=FALSE}
+
+# install(pacman) # install + require packages
+# pacman::p_load(dplyr, readr, knitr, AICcmodavg, robust, betareg, corrplot, lmtest, ggplot2, tidyr, texreg, stringr) 
+# dplyr >> filter for rows / select for collumns
+
+```
+
+R setup (w/ github), packages, and workspace
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+
+```
+
+```{r workspace, include=FALSE}
+
+# setwd()
+
+```
+
+## Read data
