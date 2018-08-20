@@ -23,8 +23,6 @@ knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 
 ```{r workspace, include=FALSE}
 
-# setwd()
-
 ## Set RasterOptions ## important when running cross.tabulation for large datasets
 rasterOptions()
 rasterOptions(tmpdir="C:/Temp.R", maxmemory=1e+10)
